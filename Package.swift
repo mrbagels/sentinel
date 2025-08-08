@@ -17,14 +17,6 @@ let package = Package(
         ),
         // Individual products for selective import
         .library(
-            name: "KeychainAccess",
-            targets: ["KeychainAccess"]
-        ),
-        .library(
-            name: "HardwareSecurity",
-            targets: ["HardwareSecurity"]
-        ),
-        .library(
             name: "Cryptography",
             targets: ["Cryptography"]
         ),
@@ -32,33 +24,25 @@ let package = Package(
             name: "DeviceSecurity",
             targets: ["DeviceSecurity"]
         ),
+        .library(
+            name: "HardwareSecurity",
+            targets: ["HardwareSecurity"]
+        ),
+        .library(
+            name: "InactivityTracker",
+            targets: ["InactivityTracker"]
+        ),
+        .library(
+            name: "KeychainAccess",
+            targets: ["KeychainAccess"]
+        ),
     ],
     dependencies: [
+        .package(url: "https://github.com/pointfreeco/swift-composable-architecture.git", from: "1.21.0"),
         .package(url: "https://github.com/pointfreeco/swift-dependencies", from: "1.9.3"),
         .package(url: "https://github.com/pointfreeco/swift-sharing", from: "2.6.0"),
     ],
     targets: [
-        // KeychainAccess - Enhanced keychain operations
-        .target(
-            name: "KeychainAccess",
-            dependencies: [
-                .product(name: "Dependencies", package: "swift-dependencies"),
-                .product(name: "DependenciesMacros", package: "swift-dependencies"),
-                .product(name: "Sharing", package: "swift-sharing"),
-            ],
-            swiftSettings: swiftSettings
-        ),
-        
-        // HardwareSecurity - Secure Enclave & Biometrics
-        .target(
-            name: "HardwareSecurity",
-            dependencies: [
-                .product(name: "Dependencies", package: "swift-dependencies"),
-                .product(name: "DependenciesMacros", package: "swift-dependencies"),
-            ],
-            swiftSettings: swiftSettings
-        ),
-        
         // Cryptography - TOTP, key derivation, crypto utilities
         .target(
             name: "Cryptography",
@@ -78,18 +62,40 @@ let package = Package(
             ],
             swiftSettings: swiftSettings
         ),
+                
+        // HardwareSecurity - Secure Enclave & Biometrics
+        .target(
+            name: "HardwareSecurity",
+            dependencies: [
+                .product(name: "Dependencies", package: "swift-dependencies"),
+                .product(name: "DependenciesMacros", package: "swift-dependencies"),
+            ],
+            swiftSettings: swiftSettings
+        ),
+        
+        // InactivityTracker - Track user activity for manual timeout
+        .target(
+            name: "InactivityTracker",
+            dependencies: [
+                .product(name: "ComposableArchitecture", package: "swift-composable-architecture"),
+                .product(name: "Dependencies", package: "swift-dependencies"),
+                .product(name: "DependenciesMacros", package: "swift-dependencies"),
+            ],
+            swiftSettings: swiftSettings
+        ),
+        
+        // KeychainAccess - Enhanced keychain operations
+        .target(
+            name: "KeychainAccess",
+            dependencies: [
+                .product(name: "Dependencies", package: "swift-dependencies"),
+                .product(name: "DependenciesMacros", package: "swift-dependencies"),
+                .product(name: "Sharing", package: "swift-sharing"),
+            ],
+            swiftSettings: swiftSettings
+        ),
         
         // Test targets
-        .testTarget(
-            name: "KeychainAccessTests",
-            dependencies: ["KeychainAccess"],
-            swiftSettings: swiftSettings
-        ),
-        .testTarget(
-            name: "HardwareSecurityTests",
-            dependencies: ["HardwareSecurity"],
-            swiftSettings: swiftSettings
-        ),
         .testTarget(
             name: "CryptographyTests",
             dependencies: ["Cryptography"],
@@ -98,6 +104,21 @@ let package = Package(
         .testTarget(
             name: "DeviceSecurityTests",
             dependencies: ["DeviceSecurity"],
+            swiftSettings: swiftSettings
+        ),
+        .testTarget(
+            name: "HardwareSecurityTests",
+            dependencies: ["HardwareSecurity"],
+            swiftSettings: swiftSettings
+        ),
+        .testTarget(
+            name: "InactivityTrackerTests",
+            dependencies: ["InactivityTracker"],
+            swiftSettings: swiftSettings
+        ),
+        .testTarget(
+            name: "KeychainAccessTests",
+            dependencies: ["KeychainAccess"],
             swiftSettings: swiftSettings
         ),
     ]

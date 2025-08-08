@@ -1,10 +1,11 @@
 # Sentinel
 
-A comprehensive Swift security toolkit providing keychain access, hardware security, cryptography, and device security features for iOS applications.
+A comprehensive Swift security toolkit providing keychain access, hardware security, cryptography, device security, and session management features for iOS applications.
 
 [![Swift Version](https://img.shields.io/badge/Swift-6.1-orange.svg)](https://swift.org)
 [![Platform](https://img.shields.io/badge/Platform-iOS%2017%2B-blue.svg)](https://developer.apple.com/ios/)
 [![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
+[![Version](https://img.shields.io/badge/Version-0.0.2-brightgreen.svg)](https://github.com/mrbagels/sentinel/releases)
 
 ## Overview
 
@@ -40,6 +41,14 @@ Sentinel is a modular security package designed for iOS applications that requir
 - Secure memory management
 - Runtime security environment analysis
 
+### ⏱️ InactivityTracker
+- Automatic session timeout management
+- Configurable warning thresholds before timeout
+- Background time tracking
+- Touch interaction detection without blocking UI
+- Integration with The Composable Architecture (TCA)
+- Async/await support for modern Swift concurrency
+
 ## Installation
 
 ### Swift Package Manager
@@ -48,7 +57,7 @@ Add Sentinel to your `Package.swift`:
 
 ```swift
 dependencies: [
-    .package(url: "https://github.com/mrbagels/sentinel", from: "1.0.0")
+    .package(url: "https://github.com/mrbagels/sentinel", from: "0.0.2")
 ]
 ```
 
@@ -137,6 +146,90 @@ let securePassword = SecureString("sensitive-data")
 // Memory is automatically wiped when SecureString is deallocated
 ```
 
+### InactivityTracker
+
+```swift
+import InactivityTracker
+import ComposableArchitecture
+import SwiftUI
+
+// Configure inactivity tracking
+@Reducer
+struct AppFeature {
+    @ObservableState
+    struct State {
+        var inactivity = InactivityTracker.State(
+            config: InactivityConfig(
+                timeout: .seconds(30 * 60),      // 30 minutes
+                warningThreshold: .seconds(2 * 60), // Warn at 2 minutes remaining
+                touchThrottleInterval: 1.0
+            )
+        )
+    }
+    
+    enum Action {
+        case inactivity(InactivityTracker.Action)
+    }
+    
+    var body: some ReducerOf<Self> {
+        Scope(state: \.inactivity, action: \.inactivity) {
+            InactivityTracker()
+        }
+        
+        Reduce { state, action in
+            switch action {
+            case .inactivity(.warningReached):
+                // Show warning to user
+                return .none
+                
+            case .inactivity(.inactivityTimeout):
+                // Log out user
+                return .none
+                
+            case .inactivity:
+                return .none
+            }
+        }
+    }
+}
+
+// Apply to your SwiftUI view
+struct ContentView: View {
+    @Bindable var store: StoreOf<AppFeature>
+    
+    var body: some View {
+        YourContent()
+            .trackInactivity(
+                store: store,
+                isActive: store.inactivity.isTrackingEnabled,
+                throttleInterval: store.inactivity.config.touchThrottleInterval
+            ) { store in
+                store.send(.inactivity(.recordActivity))
+            }
+    }
+}
+
+// Async/await monitoring
+Task {
+    let reason = await InactivityTracker.waitForTimeout(store: store)
+    if reason == .inactivityTimeout {
+        // Handle timeout
+    }
+}
+
+// Activity event stream
+for await event in InactivityTracker.activityStream(store: store) {
+    switch event {
+    case .warning(let secondsRemaining):
+        print("Warning: \(secondsRemaining) seconds until timeout")
+    case .timeout:
+        print("Session timed out")
+    default:
+        break
+    }
+}
+```
+
 ## Requirements
 
 - iOS 17.0+
@@ -148,6 +241,7 @@ let securePassword = SecureString("sensitive-data")
 
 - [swift-dependencies](https://github.com/pointfreeco/swift-dependencies) - Dependency injection
 - [swift-sharing](https://github.com/pointfreeco/swift-sharing) - State sharing and persistence
+- [swift-composable-architecture](https://github.com/pointfreeco/swift-composable-architecture) - For InactivityTracker module
 
 ## Security Considerations
 
@@ -155,6 +249,7 @@ let securePassword = SecureString("sensitive-data")
 - **Secure Enclave**: Only available on devices with A12 Bionic chip or later
 - **Memory Protection**: Swift's ARC makes complete memory wiping challenging; use SecureString for sensitive data
 - **Keychain**: Data is encrypted by iOS but may be accessible if device passcode is compromised
+- **Session Management**: InactivityTracker helps enforce security policies but should be combined with proper authentication
 
 ## Contributing
 
@@ -170,5 +265,5 @@ Kyle Begeman
 
 ## Acknowledgments
 
-- [Point-Free](https://www.pointfree.co) for their excellent Dependencies and Sharing libraries
+- [Point-Free](https://www.pointfree.co) for their excellent Dependencies, Sharing, and Composable Architecture libraries
 - The iOS security community for research and best practices
