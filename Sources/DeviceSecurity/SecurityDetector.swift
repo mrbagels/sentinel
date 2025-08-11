@@ -10,6 +10,7 @@ import Foundation
 import UIKit
 import Darwin
 import MachO
+import LocalAuthentication
 
 /// Actor providing device security detection and monitoring
 actor SecurityDetector {
@@ -17,14 +18,14 @@ actor SecurityDetector {
     // MARK: - Jailbreak Detection
     
     /// Comprehensive jailbreak detection using multiple methods
-    func isJailbroken() -> Bool {
+    func isJailbroken() async -> Bool {
         // Method 1: Check for suspicious files
         if checkSuspiciousFiles() {
             return true
         }
         
         // Method 2: Check for suspicious URL schemes
-        if checkSuspiciousURLSchemes() {
+        if await checkSuspiciousURLSchemes() {
             return true
         }
         
@@ -107,11 +108,12 @@ actor SecurityDetector {
     }
     
     /// Check for suspicious URL schemes
-    private func checkSuspiciousURLSchemes() -> Bool {
+    private func checkSuspiciousURLSchemes() async -> Bool {
         let schemes = ["cydia://", "sileo://", "zbra://", "filza://", "activator://"]
         
         // UIApplication.shared is MainActor-isolated, so we need to check from MainActor
-        return MainActor.assumeIsolated {
+        // Use await with MainActor.run instead of assumeIsolated
+        return await MainActor.run {
             for scheme in schemes {
                 if let url = URL(string: scheme),
                    UIApplication.shared.canOpenURL(url) {
@@ -259,18 +261,18 @@ actor SecurityDetector {
     
     /// Get comprehensive security environment
     func getSecurityEnvironment() async -> SecurityEnvironment {
-        let jailbroken = isJailbroken()
+        let jailbroken = await isJailbroken()
         let debuggerAttached = isDebuggerAttached()
         let simulator = isSimulator()
         let hasSecureEnclave = checkSecureEnclave()
-        let hasBiometrics = checkBiometrics()
+        let hasBiometrics = await checkBiometrics()
         
         // Get MainActor-isolated values
         let (osVersion, deviceModel) = await MainActor.run {
             (UIDevice.current.systemVersion, getDeviceModel())
         }
         
-        let integrityStatus = checkIntegrity()
+        let integrityStatus = await checkIntegrity()
         let suspiciousFiles = getSuspiciousFiles()
         let suspiciousLibraries = getSuspiciousLibraries()
         
@@ -304,10 +306,36 @@ actor SecurityDetector {
         return secureEnclaveDevices.contains { deviceModel.hasPrefix($0) }
     }
     
-    private func checkBiometrics() -> Bool {
-        // Import LocalAuthentication would be needed for full check
-        // Simplified version
-        return checkSecureEnclave()  // If has Secure Enclave, likely has biometrics
+    /// Properly check for biometric enrollment using LocalAuthentication
+    private func checkBiometrics() async -> Bool {
+        let context = LAContext()
+        var error: NSError?
+        
+        // Check if biometric authentication is available and enrolled
+        let canEvaluate = context.canEvaluatePolicy(.deviceOwnerAuthenticationWithBiometrics, error: &error)
+        
+        if canEvaluate {
+            // Biometrics are available and enrolled
+            return true
+        } else if let error = error {
+            // Check the specific error
+            switch error.code {
+            case LAError.biometryNotAvailable.rawValue:
+                // No biometric hardware
+                return false
+            case LAError.biometryNotEnrolled.rawValue:
+                // Hardware exists but no biometrics enrolled
+                return false
+            case LAError.biometryLockout.rawValue:
+                // Biometrics exist but are locked out
+                // We still return true since biometrics are enrolled
+                return true
+            default:
+                return false
+            }
+        }
+        
+        return false
     }
     
     private nonisolated func getDeviceModel() -> String {
@@ -360,7 +388,7 @@ actor SecurityDetector {
     // MARK: - Integrity Check
     
     /// Check application integrity
-    func checkIntegrity() -> IntegrityStatus {
+    func checkIntegrity() async -> IntegrityStatus {
         // Check if app binary has been modified
         if checkBinaryIntegrity() {
             return .modified
@@ -428,10 +456,10 @@ actor SecurityDetector {
     }
     
     /// Calculate overall security score
-    func calculateSecurityScore() -> Int {
+    func calculateSecurityScore() async -> Int {
         var score = 100
         
-        if isJailbroken() {
+        if await isJailbroken() {
             score -= 50
         }
         
@@ -447,11 +475,11 @@ actor SecurityDetector {
             score -= 10
         }
         
-        if !checkBiometrics() {
+        if !(await checkBiometrics()) {
             score -= 5
         }
         
-        if checkIntegrity() != .intact {
+        if await checkIntegrity() != .intact {
             score -= 20
         }
         

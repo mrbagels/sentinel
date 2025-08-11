@@ -191,6 +191,7 @@ extension DependencyValues {
 
 extension DeviceSecurity: DependencyKey {
     /// Live implementation
+    /// Fixed: All methods now properly await async SecurityDetector methods
     public static let liveValue: DeviceSecurity = {
         let detector = SecurityDetector()
         
